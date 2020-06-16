@@ -186,7 +186,7 @@ client.on('ready', async () =>
                     channel.messages.fetch();
                 }
             });    
-
+        
             
     });
     
@@ -231,6 +231,12 @@ client.on('guildCreate', guild =>
     let channel = client.channels.cache.get(guild.systemChannelID || channelID);
     channel.send(`Thanks for inviting me into this server! I will need you to provide me some information before we start! Can you give me id of the sensei role?`);
    
+});
+
+client.on('guildDelete', async guild => {
+
+    await GuildList.destroy({where: {guildId: guild.id}});
+    await UserList.destroy({where: {guildId: guild.id}});
 });
 
 
@@ -849,5 +855,9 @@ client.on('guildMemberAdd', async member =>
     
 });
 
+client.on('guildMemberRemove', async member => {
+    await UserList.destroy({where: {guildId: member.guild.id, usersId: member.id}});
+    await EventPeopleList.destroy({where: {usersId: member.id, guildId: member.guild.id}});
+});
 
 
