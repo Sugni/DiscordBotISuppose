@@ -143,6 +143,17 @@ client.on('ready', async () =>
         }
         else if(membersGuild.added === true)
         {
+            await UserList.sync();
+
+            await UserList.findAll({where: {guildId: membersGuild.guildId}}).then(guildUsers => {
+                        guildUsers.forEach((guildUser) => {
+                            if(!guild.members.cache.has(guildUser.usersId))
+                            {
+                                guildUser.destroy();
+                            }
+                        });
+            });   
+            
             guild.members.cache.forEach(async member => 
                 {
                     if (member.user.bot)
@@ -175,8 +186,7 @@ client.on('ready', async () =>
                         }
                         return //console.log('Something went wrong with adding a tag.');
                     }
-                });
-                        
+            });
         }
         guild.channels.cache.forEach(channel => 
             {
@@ -185,7 +195,7 @@ client.on('ready', async () =>
                 {
                     channel.messages.fetch();
                 }
-            });    
+        });    
         
             
     });
@@ -690,40 +700,49 @@ client.on('message', async message =>
                 }
                 else if(command === 'reloadUserList' && message.member.roles.cache.get(membersGuild.senseiRoleId))
                 {
-                    UserList.sync();
-    
+                    await UserList.sync();
+                    
+                    await UserList.findAll({where: {guildId: membersGuild.guildId}}).then(guildUsers => {
+                        guildUsers.forEach((guildUser) => {
+                            if(!message.guild.members.cache.has(guildUser.usersId))
+                            {
+                                guildUser.destroy();
+                            }
+                        });
+                    })
+
                     message.guild.members.cache.forEach(async member => 
-                        {
+                    {
                             if (member.user.bot)
                             {
                                 return;
                             }
-                    try 
-                    {   
-                        const userList = await UserList.findOne({where: {usersId: member.user.id, guildId: membersGuild.guildId}});
-                            if(userList)
+                            try 
+                            {   
+                                const userList = await UserList.findOne({where: {usersId: member.user.id, guildId: membersGuild.guildId}});
+                                    if(userList)
+                                    {
+                                        return console.log('That tag already exists.');
+                                    };            
+                                const userName = await UserList.create(
+                                {                                
+                                    usersId: member.user.id,
+                                    username: member.user.username,
+                                    guildId: membersGuild.guildId,
+                                    guildName: membersGuild.guildName
+                                });
+                                UserList.sync();
+                                return console.log(`Tag ${userName.username} added to ${userName.guildName} guild.`);
+                            }
+                            catch (e) 
                             {
-                                return console.log('That tag already exists.');
-                            };            
-                        const userName = await UserList.create(
-                        {                                
-                            usersId: member.user.id,
-                            username: member.user.username,
-                            guildId: membersGuild.guildId,
-                            guildName: membersGuild.guildName
-                        });
-                        UserList.sync();
-                        return console.log(`Tag ${userName.username} added to ${userName.guildName} guild.`);
-                    }
-                    catch (e) 
-                    {
-                        if (e.name === 'SequelizeUniqueConstraintError') 
-                        {
-                            return console.log('That tag already exists.');
-                        }
-                        return console.log('Something went wrong with adding a tag.');
-                    }
-                });
+                                if (e.name === 'SequelizeUniqueConstraintError') 
+                                {
+                                    return console.log('That tag already exists.');
+                                }
+                                return console.log('Something went wrong with adding a tag.');
+                            }
+                    });
                 }
                 else if(command === 'leaderboard')
                 {
@@ -855,9 +874,18 @@ client.on('guildMemberAdd', async member =>
     
 });
 
-client.on('guildMemberRemove', async member => {
-    await UserList.destroy({where: {guildId: member.guild.id, usersId: member.id}});
-    await EventPeopleList.destroy({where: {usersId: member.id, guildId: member.guild.id}});
+client.on('guildMemberRemove', async member => 
+{
+    const membersGuild = await GuildList.findOne({where: {guildId: member.guild.id}});
+    if(membersGuild.added === true)
+    {
+        if (member.user.bot)
+        {
+            return;
+        }
+        await UserList.destroy({where: {guildId: member.guild.id, usersId: member.id}});
+        await EventPeopleList.destroy({where: {usersId: member.id, guildId: member.guild.id}});
+    }
 });
 
 
